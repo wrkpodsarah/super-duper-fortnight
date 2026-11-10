@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Team Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      background: #faf9f7;
+      color: #222;
+      padding: 32px 20px;
+    }
+    main { max-width: 900px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 2.4rem; color: #1d6f64; }
+    .subtitle { margin: 0 0 28px; color: #666; }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #e6e3de;
+      border-radius: 6px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    h2 { margin: 0 0 16px; font-size: 1.25rem; }
+
+    form { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items: end; }
+    label { display: block; font-size: 0.9rem; color: #555; margin-bottom: 4px; }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px 10px;
+      font: inherit;
+      border: 1px solid #c9c5be;
+      border-radius: 4px;
+      background: #fff;
+    }
+    input:focus-visible, button:focus-visible { outline: 3px solid #1d6f64; outline-offset: 2px; }
+
+    button {
+      font: inherit;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      background: #1d6f64;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #165a51; }
+    button.remove { background: none; color: #a33; padding: 4px 8px; border: 1px solid #e3c3c3; }
+    button.remove:hover { background: #fbeeee; }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #ece9e4; white-space: nowrap; }
+    th { font-weight: bold; color: #555; background: #f6f4f0; }
+    .empty { color: #777; padding: 16px 0 4px; }
+    .note { font-size: 0.9rem; color: #777; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Team Dashboard</h1>
+    <p class="subtitle" id="count"></p>
+
+    <section class="panel">
+      <h2>Add a team member</h2>
+      <form id="addForm">
+        <div>
+          <label for="name">Name</label>
+          <input id="name" required>
+        </div>
+        <div>
+          <label for="birthdate">Birthdate</label>
+          <input id="birthdate" type="date" required>
+        </div>
+        <div>
+          <label for="hireDate">Hire date</label>
+          <input id="hireDate" type="date" required>
+        </div>
+        <div>
+          <label for="client">Client name</label>
+          <input id="client" required>
+        </div>
+        <div>
+          <button type="submit">Add entry</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Team</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Birthdate</th>
+              <th>Hire date</th>
+              <th>Client</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="empty" id="empty" hidden>No team members yet. Use the form above to add the first one.</p>
+    </section>
+
+    <p class="note">Entries you add are saved in this browser only. To make an entry permanent for everyone, add it to the starting list in the code.</p>
+  </main>
+
+  <script>
+    // ===== STARTING LIST: everyone who sees the page will see these people =====
+    // To add a person permanently, copy one line and change the details.
+    // Dates use the format year-month-day.
+    const startingTeam = [
+      { name: "Maria Santos", birthdate: "1992-03-14", hireDate: "2021-06-01", client: "Acme Corp" },
+      { name: "John Reyes",   birthdate: "1988-11-02", hireDate: "2019-02-18", client: "Globex" },
+      { name: "Ana Cruz",     birthdate: "1995-07-25", hireDate: "2023-09-11", client: "Initech" }
+    ];
+    // ===========================================================================
+
+    const storageKey = "teamDashboardEntries";
+
+    // Load entries added through the form (saved in this browser)
+    function loadAdded() {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+    function saveAdded(list) {
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(list));
+      } catch (e) {
+        alert("Your browser could not save this entry. It will disappear when you refresh.");
+      }
+    }
+
+    let added = loadAdded();
+
+    // Turn "2021-06-01" into "June 1, 2021"
+    function formatDate(text) {
+      const d = new Date(text + "T00:00:00");
+      return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    }
+
+    function render() {
+      const body = document.getElementById("rows");
+      body.innerHTML = "";
+
+      // Combine the starting list with entries added by form
+      const everyone = startingTeam.map(p => ({ ...p, removable: false }))
+        .concat(added.map((p, i) => ({ ...p, removable: true, index: i })));
+
+      everyone.sort((a, b) => a.name.localeCompare(b.name));
+
+      everyone.forEach(person => {
+        const row = document.createElement("tr");
+        // textContent keeps typed text safe (it is never treated as code)
+        [person.name, formatDate(person.birthdate), formatDate(person.hireDate), person.client]
+          .forEach(text => {
+            const cell = document.createElement("td");
+            cell.textContent = text;
+            row.appendChild(cell);
+          });
+
+        const actionCell = document.createElement("td");
+        if (person.removable) {
+          const btn = document.createElement("button");
+          btn.className = "remove";
+          btn.textContent = "Remove";
+          btn.setAttribute("aria-label", "Remove " + person.name);
+          btn.addEventListener("click", () => {
+            added.splice(person.index, 1);
+            saveAdded(added);
+            render();
+          });
+          actionCell.appendChild(btn);
+        }
+        row.appendChild(actionCell);
+        body.appendChild(row);
+      });
+
+      document.getElementById("empty").hidden = everyone.length > 0;
+      document.getElementById("count").textContent =
+        everyone.length + (everyone.length === 1 ? " team member" : " team members");
+    }
+
+    // When the form is submitted, add the new person
+    document.getElementById("addForm").addEventListener("submit", function (event) {
+      event.preventDefault();
+      added.push({
+        name: document.getElementById("name").value.trim(),
+        birthdate: document.getElementById("birthdate").value,
+        hireDate: document.getElementById("hireDate").value,
+        client: document.getElementById("client").value.trim()
+      });
+      saveAdded(added);
+      render();
+      this.reset();
+      document.getElementById("name").focus();
+    });
+
+    render();
+  </script>
+</body>
+</html>
